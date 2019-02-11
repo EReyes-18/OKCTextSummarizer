@@ -1,0 +1,73 @@
+
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import pandas as pd
+
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
+server = app.server
+
+#read csv file
+df = pd.read_excel('./final_df.xlsx')
+#expand column
+pd.set_option('display.max_colwidth', -1)
+
+app.layout = html.Div([
+    html.H1(children='OKCupid Text Summarizer',style={'textAlign': 'center'}), #'color': colors['text']}),
+
+#writing on top of bar
+    html.H1(children='Enter a OKC_ID:'),
+#first input bar
+    dcc.Input(id='my-id-a',value='OKC_1',type='text', style={'textAlign': 'center'}),html.Div(id='output-a'),
+
+    dcc.Markdown( ''' # Full Profile'''),
+    html.H2(id = "output-a", children = "testing"), #google HTML or dash html core components library, style paragraph
+
+#writing on top of bar
+    html.H1(children='Summary Profile'),
+
+#second input bar
+    html.H2(id = "output-b", children = "testing") #google dash html paragraphing/ formating core components library, style paragraph
+    ])
+
+
+
+
+# first callback: bigram
+@app.callback(
+    Output(component_id='output-a', component_property='children'),
+    [Input(component_id='my-id-a', component_property='value')]
+)
+def update_output_b(selected_value):
+    return(
+
+        '{}'
+
+    ).format(
+        df[df.OKC_User == selected_value]\
+             .full_text
+    )
+
+# second callback: summary
+@app.callback(
+    Output(component_id='output-b', component_property='children'),
+    [Input(component_id='my-id-a', component_property='value')]
+)
+def update_output_a(selected_value):
+    return(
+        '{} '
+    ).format(
+        df[df.OKC_User == selected_value]\
+
+    )
+
+
+
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
