@@ -1,0 +1,140 @@
+import numpy as np
+import pandas as pd
+import nltk
+from nltk.tokenize import sent_tokenize
+import networkx as nx
+import re
+from nltk.corpus import stopwords
+from sklearn.metrics.pairwise import cosine_similarity
+#nltk.download('punkt') # one time execution
+#nltk.download('stopwords')
+
+#load files
+df = pd.read_csv('profiles.csv')
+df = df.head(50)
+#join essays
+columns = df.loc[:, ["essay0","essay1","essay2","essay3","essay4","essay5","essay6","essay7","essay8","essay9"]]
+#dropna
+columns.dropna()
+sample = columns
+
+#combine columns into one column
+sample['combined']=sample['essay0'].astype(str)+' '+sample['essay1']+' '+sample['essay2']+' '+sample['essay3']+' '+sample['essay4']+' '+sample['essay5']+' '+sample['essay6']+' '+sample['essay7']+' '+sample['essay8']+' '+sample['essay9']
+#isolate combined text column 
+col = sample.loc[:, "combined"]
+#dropna
+col_drop = col.dropna()
+#get columns
+two = col_drop.iloc[0:10,]
+#make dateframe
+df_two= pd.DataFrame({'combo_text':two})
+
+#remove html tags
+#replace 
+df_two = df_two.replace(to_replace= '<br />', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= '\n', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= '<em>', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= '<strong>', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= '</strong>', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= '</em>', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= '</a>', value=' ', regex=True)
+#replace 
+df_two = df_two.replace(to_replace= 'amp', value=' ', regex=True)
+
+
+# function to remove stopwords #but didn't end up removing stop words because sentences didn't make sense 
+def remove_stopwords(sen, stop_words):
+    sen_new = " ".join([i for i in sen if i not in stop_words])
+    return sen_new
+
+def load_embeddings():
+
+    word_embeddings = {}
+    f = open('glove.6B.100d.txt', encoding='utf-8')
+    for line in f:
+        values = line.split()
+        word = values[0]
+        coefs = np.asarray(values[1:], dtype='float32')
+        word_embeddings[word] = coefs
+    f.close()
+
+    return word_embeddings
+
+def create_clean_sentences(sentences):
+
+    # remove punctuations, numbers and special characters
+    clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z]", " ")
+
+    return clean_sentences
+
+def create_sentence_vectors(clean_sentences, word_embeddings):
+
+    sentence_vectors = []
+    for i in clean_sentences:
+        if len(i) != 0:
+            v = sum([word_embeddings.get(w, np.zeros((100,))) for w in i.split()]) / (len(i.split()) + 0.001)
+        else:
+            v = np.zeros((100,))
+        sentence_vectors.append(v)
+
+    return sentence_vectors
+
+def extract_sentences(user_text_data):
+    sentences = []
+    for s in user_text_data:
+        r = sent_tokenize(s)
+        sentences.append(r)
+
+    # print(sentences)
+    sentences = [y for x in sentences for y in x]  # flatten list
+    return sentences
+
+def summary(user_text_data, word_embeddings):
+
+    # Extract sentences from user blurb
+    sentences = extract_sentences(user_text_data)
+    # Clean sentences
+    clean_sentences = create_clean_sentences(sentences)
+   
+    #create custom stopwords
+    #custom_stopwords = ["full_text"]
+    #clean_sentences = [remove_stopwords(sen, custom_stopwords) for sen in clean_sentences]
+
+    # create sentence vectors
+    sentence_vectors = create_sentence_vectors(clean_sentences, word_embeddings)
+
+    # Similarity Matrix Preparation
+    # similarity matrix
+    sim_mat = np.zeros([len(clean_sentences), len(clean_sentences)])
+
+    # initialize the matrix with cosine similarity scores.
+    for i in range(len(clean_sentences)):
+        for j in range(len(clean_sentences)):
+            if i != j:
+                sim_mat[i][j] = cosine_similarity(
+                    sentence_vectors[i].reshape(1, 100),
+                    sentence_vectors[j].reshape(1, 100)
+                )[0, 0]
+
+    # PageRank Algorithm
+    nx_graph = nx.from_numpy_array(sim_mat)
+    scores = nx.pagerank(nx_graph)
+
+    # Summary Extraction
+    # extract the top N sentences based on their rankings for summary generation.
+    ranked_sentences = sorted(((scores[i], s) for i, s in enumerate(clean_sentences)), reverse=True)
+
+    final = [sentence for score, sentence in ranked_sentences[:3]]
+    return '. '.join(final)
+ 
+ #load word embeddings
+ word_embed = load_embeddings()
+ 
+ 
+ 
